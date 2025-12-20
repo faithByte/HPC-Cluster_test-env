@@ -1,0 +1,3 @@
+INTERNAL_NETWORK: 192.168.57.0/24
+DOMAINE_NAME: #.cluster.ma
+MASTER: 192.168.57.10 #master ip for now [change it after load balancing]

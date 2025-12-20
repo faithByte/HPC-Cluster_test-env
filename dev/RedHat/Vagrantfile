@@ -1,0 +1,134 @@
+MASTER_NODES = 1
+WORKER_NODES = 1
+NFS_NODES = 0
+DNS_NODES = 0
+
+NETWORK_IP = "192.168.56."
+# master .10
+# dns	.9
+# nfs	.8
+# nodex	.(10 + x)
+
+Vagrant.configure("2") do |config|
+	# config.vm.box_version = "4.3.12"
+	config.vm.provider "virtualbox" do |vb|
+		vb.memory = "2048"
+		vb.cpus = 2
+	end
+
+	config.vm.synced_folder "../../", "/vagrant"
+
+	config.vm.provision "shell", inline: <<-SHELL
+		dnf update -y
+		dnf install -y vim sshpass
+
+		# ssh config
+		sed -i.bak 's/^PasswordAuthentication no/PasswordAuthentication yes/' "/etc/ssh/sshd_config"
+		sed -i.bak 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' "/etc/ssh/sshd_config"
+		ssh-keygen -t rsa -b 4096 -f "$HOME/.ssh/id_rsa" -N "" 
+		systemctl reload sshd
+
+		echo "root: " | chpasswd
+		
+		echo 'cd /vagrant/dev' >> /root/.bashrc
+		echo 'export DIR=RedHat' >> /root/.bashrc
+	SHELL
+
+	(1..DNS_NODES).each do |i|
+		config.vm.define "dns" do |dns|
+			dns.vm.box_version = "4.3.12"
+			dns.vm.hostname = "dns"
+			dns.vm.network "private_network", ip: "192.168.56.9"
+			dns.vm.provider "virtualbox" do |vb|
+				vb.memory = "1024"
+				vb.cpus = 1
+			end
+		end
+	end
+
+	(1..NFS_NODES).each do |i|
+		config.vm.define "nfs" do |nfs|
+			nfs.vm.box_version = "4.3.12"
+			nfs.vm.hostname = "nfs"
+			nfs.vm.network "private_network", ip: "192.168.56.8"
+			nfs.vm.provider "virtualbox" do |vb|
+				vb.memory = "1024"
+				vb.cpus = 1
+			end
+		end
+	end
+
+	(1..WORKER_NODES).each do |i|
+		config.vm.define "node#{i}" do |node|
+			node.vm.box_version = "4.3.12"
+
+			node.vm.box = "generic/rocky9"
+			node.vm.synced_folder "../../", "/vagrant"
+			node.vm.hostname = "node#{i}"
+			node.vm.network :private_network, ip: NETWORK_IP + "#{10 + i}"
+			# node.vm.provider "virtualbox" do |vb|
+			# 	vb.customize ["modifyvm", :id, "--nic1", "none"]
+			# end
+			node.vm.provision "shell", inline: <<-SHELL
+				ip route del default || true
+				echo 'ip route del default || true' >> /root/.profile
+			SHELL
+		end
+	end
+
+	config.vm.define "master" do |master|
+		# master.vm.box_version = "4.3.12"
+		# master.vm.box = "generic/rhel9"
+
+		# local clone #############################
+		master.vm.box = "master_rhel9" 
+		master.ssh.username = "vagrant"
+		master.ssh.password = "vagrant"
+		rm ~/.ssh/known_hosts
+		###########################################
+
+		master.vm.hostname = "master"
+		master.vm.network "private_network", ip: "192.168.56.10"
+	
+
+		master.vm.provision "shell", inline: <<-SHELL
+			# # register rhel
+			# source /vagrant/dev/RedHat/passwords.sh
+			# subscription-manager remove --all
+			# subscription-manager unregister
+			# subscription-manager clean
+			# dnf clean all
+			# rm -rf /var/cache/yum/*
+			# subscription-manager register --username $RH_USER --password $RH_PASS --auto-attach
+
+			# # ansible config
+			# dnf install -y ansible
+			# echo [defaults] > ~/.ansible.cfg
+			# echo "host_key_checking = False" >> ~/.ansible.cfg
+
+			# ssh config
+			sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@192.168.56.10
+			WORKER_NODES=#{WORKER_NODES}
+			for (( i=1; i<=WORKER_NODES; i++ )) do
+				sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@192.168.56.$(($i + 10))
+				ssh root@192.168.56.$(($i + 10)) "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@192.168.56.10"
+			done
+
+			DNS_NODES=#{DNS_NODES}
+			if [ "$DNS_NODES" -ne 0 ]; then
+				sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@192.168.56.9
+				ssh root@192.168.56.9 "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@192.168.56.10"
+			fi
+
+			NFS_NODES=#{NFS_NODES}
+			if [ "$NFS_NODES" -ne 0 ]; then
+				sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@192.168.56.8
+				ssh root@192.168.56.8 "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@192.168.56.10"
+			fi
+		SHELL
+	end
+
+end
+
+# kubectl cp laplacien_3d.py default/<some-pod>:/data
+# mpirun --allow-run-as-root -np 2 python laplacien_3d.py
