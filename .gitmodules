@@ -1,0 +1,3 @@
+[submodule "HPC-Cluster"]
+	path = HPC-Cluster
+	url = git@github.com:faithByte/HPC-Cluster.git
