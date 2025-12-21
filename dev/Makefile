@@ -2,37 +2,41 @@ MAKEFLAGS += --silent --ignore-errors
 
 PLAYBOOK = playbook.yml
 
-DIR ?= Debian/
+ifndef OS
+	NAME := deb
+	OS := Debian
+else
+	OS := RedHat 
+	NAME := rhel
+endif
 
 ## vagrant
 vms:
-	cd $(DIR) && make vms
-
-master:
-	cd $(DIR) && make master
+	vagrant up
+	vagrant ssh master_$(NAME) -c "sudo -i"
 
 clean:
-	cd $(DIR) && make clean
+	vagrant destroy -f
 
-re:
-	cd $(DIR) && make re
+re: clean vms
 
 # inside the VMs 
 check:
-	@cp -rf ./$(DIR)/inventories ../HPC-Cluster
+	@cp -rf ./inventories_$(OS) ../HPC-Cluster/inventories
 	@cd ../HPC-Cluster && \
 	ansible-playbook $(PLAYBOOK) --syntax-check && \
 	ansible-playbook $(PLAYBOOK) --check
 
 run:
-	@cp -rf ./$(DIR)/inventories ../HPC-Cluster
+	@cp -rf ./inventories_$(OS) ../HPC-Cluster/inventories
 	@cd ../HPC-Cluster && ansible-playbook $(PLAYBOOK);
 
 dbg:
-	@cp -rf ./$(DIR)/inventories ../HPC-Cluster
+	@cp -rf ./inventories_$(OS) ../HPC-Cluster/inventories
 	@cd ../HPC-Cluster && ansible-playbook -vvv $(PLAYBOOK);
 
 task:
+	@cp -rf ./inventories_$(OS) ../HPC-Cluster/inventories
 	@cd ../HPC-Cluster && ansible-playbook $(PLAYBOOK) --start-at-task="$(TASK)"
 
-.PHONY: all vms master clean re run check 
+.PHONY: all vms clean re run check 

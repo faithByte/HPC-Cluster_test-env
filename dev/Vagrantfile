@@ -1,0 +1,113 @@
+OS = ENV['OS']
+
+MASTER_NODES = 1
+WORKER_NODES = 1
+NFS_NODES = 0
+DNS_NODES = 0
+
+if OS == "RedHat"
+	NETWORK_IP = "192.168.56"
+	MASTER_IMG = "master_rhel9"
+	NODE_IMG = "node_rocky9"
+	NAME = "rhel"
+else
+	NETWORK_IP = "192.168.57"
+	MASTER_IMG = "master_debian"
+	NODE_IMG = "node_debian"
+	NAME = "deb"
+end
+
+# master .10
+# dns	.9
+# nfs	.8
+# nodeX	.(10 + X)
+
+Vagrant.configure("2") do |config|
+	config.vm.provider "virtualbox" do |vb|
+		vb.memory = "2048"
+		vb.cpus = 2
+	end
+
+	config.vbguest.auto_update = false
+
+	config.vm.synced_folder "../", "/vagrant", 
+							type: "rsync", 
+							rsync__auto: true,
+							rsync__exclude: ["*.box", "Machines/", ".git*", "passwords*"]
+	
+	config.ssh.username = "vagrant"
+	config.ssh.password = "vagrant"
+
+	config.vm.provision "shell", inline: <<-SHELL
+		rm -rf "~/.ssh/*"
+		ssh-keygen -t rsa -b 4096 -y -f "$HOME/.ssh/id_rsa" -N "" 
+		systemctl reload sshd
+	SHELL
+
+	config.vm.define "master_#{NAME}" do |master|
+		master.vm.box = "#{MASTER_IMG}"
+
+		master.vm.hostname = "master"
+		master.vm.network "private_network", ip: NETWORK_IP + ".10"
+	
+		# master.vm.provision "shell", inline: <<-SHELL
+		# 	sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10
+
+		# 	for (( i=1; i<="#{WORKER_NODES}"; i++ )) do
+		# 		sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.$(($i + 10))
+		# 		ssh root@#{NETWORK_IP}.$(($i + 10)) "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10"
+		# 	done
+
+		# 	if [ "#{DNS_NODES}" -ne 0 ]; then
+		# 		sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.9
+		# 		ssh "root@#{NETWORK_IP}.9" "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10"
+		# 	fi
+
+		# 	if [ "#{NFS_NODES}" -ne 0 ]; then
+		# 		sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.8
+		# 		ssh "root@#{NETWORK_IP}.8" "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10"
+		# 	fi
+		# SHELL
+	end
+
+	if DNS_NODES != 0
+		config.vm.define "dns_#{NAME}" do |dns|
+			dns.vm.box = "#{NODE_IMG}"
+			dns.vm.hostname = "dns"
+			dns.vm.network "private_network", ip: NETWORK_IP + ".9"
+			dns.vm.provider "virtualbox" do |vb|
+				vb.memory = "1024"
+				vb.cpus = 1
+			end
+		end
+	end
+
+	if NFS_NODES != 0
+		config.vm.define "nfs_#{NAME}" do |nfs|
+			nfs.vm.box = "#{NODE_IMG}"
+			nfs.vm.hostname = "nfs"
+			nfs.vm.network "private_network", ip: NETWORK_IP + ".8"
+			nfs.vm.provider "virtualbox" do |vb|
+				vb.memory = "1024"
+				vb.cpus = 1
+			end
+		end
+	end
+
+	(1..WORKER_NODES).each do |i|
+		config.vm.define "node#{i}_#{NAME}" do |node|
+			node.vm.box = "#{NODE_IMG}"
+			node.vm.hostname = "node#{i}"
+			node.vm.network :private_network, ip: NETWORK_IP + ".#{10 + i}"
+			node.vm.provision "shell", inline: <<-SHELL
+				ip route del default || true
+				echo 'ip route del default || true' >> /root/.profile
+				# if [ "#{OS}" -e "RedHat" ]; then
+				# 	dnf config-manager --set-disabled "*"
+				# 	dnf config-manager --set-enabled appstream baseos
+				# fi
+			SHELL
+		end
+	end
+
+end
