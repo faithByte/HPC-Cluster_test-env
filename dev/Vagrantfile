@@ -39,36 +39,10 @@ Vagrant.configure("2") do |config|
 	config.ssh.password = "vagrant"
 
 	config.vm.provision "shell", inline: <<-SHELL
-		rm -rf "~/.ssh/*"
-		ssh-keygen -t rsa -b 4096 -y -f "$HOME/.ssh/id_rsa" -N "" 
+		rm -rf ~/.ssh/*
+		ssh-keygen -t rsa -b 4096 -f "$HOME/.ssh/id_rsa" -N "" 
 		systemctl reload sshd
 	SHELL
-
-	config.vm.define "master_#{NAME}" do |master|
-		master.vm.box = "#{MASTER_IMG}"
-
-		master.vm.hostname = "master"
-		master.vm.network "private_network", ip: NETWORK_IP + ".10"
-	
-		# master.vm.provision "shell", inline: <<-SHELL
-		# 	sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10
-
-		# 	for (( i=1; i<="#{WORKER_NODES}"; i++ )) do
-		# 		sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.$(($i + 10))
-		# 		ssh root@#{NETWORK_IP}.$(($i + 10)) "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10"
-		# 	done
-
-		# 	if [ "#{DNS_NODES}" -ne 0 ]; then
-		# 		sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.9
-		# 		ssh "root@#{NETWORK_IP}.9" "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10"
-		# 	fi
-
-		# 	if [ "#{NFS_NODES}" -ne 0 ]; then
-		# 		sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.8
-		# 		ssh "root@#{NETWORK_IP}.8" "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10"
-		# 	fi
-		# SHELL
-	end
 
 	if DNS_NODES != 0
 		config.vm.define "dns_#{NAME}" do |dns|
@@ -108,6 +82,32 @@ Vagrant.configure("2") do |config|
 				# fi
 			SHELL
 		end
+	end
+
+	config.vm.define "master_#{NAME}" do |master|
+		master.vm.box = "#{MASTER_IMG}"
+
+		master.vm.hostname = "master"
+		master.vm.network "private_network", ip: NETWORK_IP + ".10"
+	
+		master.vm.provision "shell", inline: <<-SHELL
+			sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10
+
+			for (( i=1; i<="#{WORKER_NODES}"; i++ )) do
+				sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.$(($i + 10))
+				ssh root@#{NETWORK_IP}.$(($i + 10)) "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10"
+			done
+
+			if [ "#{DNS_NODES}" -ne 0 ]; then
+				sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.9
+				ssh "root@#{NETWORK_IP}.9" "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10"
+			fi
+
+			if [ "#{NFS_NODES}" -ne 0 ]; then
+				sshpass -p " " ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.8
+				ssh "root@#{NETWORK_IP}.8" "sshpass -p ' ' ssh-copy-id -o StrictHostKeyChecking=no root@#{NETWORK_IP}.10"
+			fi
+		SHELL
 	end
 
 end

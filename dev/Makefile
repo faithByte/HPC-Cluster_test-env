@@ -12,30 +12,34 @@ endif
 
 ## vagrant
 vms:
-	vagrant up
-	vagrant ssh master_$(NAME) -c "sudo -i"
+	OS=$(OS); vagrant up
+	OS=$(OS); vagrant ssh master_$(NAME) -c "sudo -i"
 
 clean:
-	vagrant destroy -f
+	OS=$(OS); vagrant destroy -f
 
 re: clean vms
 
 # inside the VMs 
 check:
+	@rm -rf ../HPC-Cluster/inventories
 	@cp -rf ./inventories_$(OS) ../HPC-Cluster/inventories
 	@cd ../HPC-Cluster && \
 	ansible-playbook $(PLAYBOOK) --syntax-check && \
 	ansible-playbook $(PLAYBOOK) --check
 
 run:
+	@rm -rf ../HPC-Cluster/inventories
 	@cp -rf ./inventories_$(OS) ../HPC-Cluster/inventories
 	@cd ../HPC-Cluster && ansible-playbook $(PLAYBOOK);
 
 dbg:
+	@rm -rf ../HPC-Cluster/inventories
 	@cp -rf ./inventories_$(OS) ../HPC-Cluster/inventories
 	@cd ../HPC-Cluster && ansible-playbook -vvv $(PLAYBOOK);
 
 task:
+	@rm -rf ../HPC-Cluster/inventories
 	@cp -rf ./inventories_$(OS) ../HPC-Cluster/inventories
 	@cd ../HPC-Cluster && ansible-playbook $(PLAYBOOK) --start-at-task="$(TASK)"
 
