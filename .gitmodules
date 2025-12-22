@@ -1,3 +1,6 @@
 [submodule "HPC-Cluster"]
 	path = HPC-Cluster
 	url = git@github.com:faithByte/HPC-Cluster.git
+[submodule "GWTFlow"]
+	path = GWTFlow
+	url = git@github.com:faithByte/GWTFlow.git
