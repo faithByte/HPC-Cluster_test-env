@@ -3,7 +3,7 @@ OS = ENV['OS']
 MASTER_NODES = 1
 WORKER_NODES = 1
 NFS_NODES = 0
-DNS_NODES = 0
+DNS_NODES = 1
 
 if OS == "RedHat"
 	NETWORK_IP = "192.168.56"
@@ -28,13 +28,17 @@ Vagrant.configure("2") do |config|
 		vb.cpus = 2
 	end
 
-	config.vbguest.auto_update = false
+	# config.vbguest.auto_update = false
 
-	config.vm.synced_folder "../", "/vagrant", 
+	if OS == "RedHat"
+		config.vm.synced_folder "../", "/vagrant",
 							type: "rsync", 
 							rsync__auto: true,
-							rsync__exclude: ["*.box", "Machines/", ".git*", "passwords*"]
-	
+							rsync__exclude: ["Machines/", ".git/", ".gitignore", ".gitmodules", "passwords.sh"]
+	else 
+		config.vm.synced_folder "../", "/vagrant"
+	end
+
 	config.ssh.username = "vagrant"
 	config.ssh.password = "vagrant"
 
@@ -42,6 +46,8 @@ Vagrant.configure("2") do |config|
 		rm -rf ~/.ssh/*
 		ssh-keygen -t rsa -b 4096 -f "$HOME/.ssh/id_rsa" -N "" 
 		systemctl reload sshd
+		export "OS=#{OS}"
+		echo "export OS=#{OS}" >> ~/.bashrc
 	SHELL
 
 	if DNS_NODES != 0

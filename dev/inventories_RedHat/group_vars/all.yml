@@ -1,3 +1,7 @@
 INTERNAL_NETWORK: 192.168.56.0/24
-DOMAINE_NAME: #.cluster.ma
+NETWORK_GATEWAY: 192.168.56.1
+DOMAIN_NAME: cluster.ma
 MASTER: 192.168.56.10 # master ip for now [change it after load balancing]
+
+# default
+ansible_os_family: RedHat

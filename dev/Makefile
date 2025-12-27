@@ -18,6 +18,17 @@ vms:
 clean:
 	OS=$(OS); vagrant destroy -f
 
+reboot:
+	OS=$(OS); vagrant halt
+	OS=$(OS); make vms
+
+reb:
+	OS=$(OS); vagrant halt master_$(NAME)
+	OS=$(OS); make vms
+
+sync:
+	OS=$(OS); vagrant rsync-auto master_$(NAME)
+
 re: clean vms
 
 # inside the VMs 
@@ -43,4 +54,4 @@ task:
 	@cp -rf ./inventories_$(OS) ../HPC-Cluster/inventories
 	@cd ../HPC-Cluster && ansible-playbook $(PLAYBOOK) --start-at-task="$(TASK)"
 
-.PHONY: all vms clean re run check 
+.PHONY: all vms clean re sync check run dbg task 
